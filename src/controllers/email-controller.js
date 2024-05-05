@@ -1,5 +1,7 @@
 const { StatusCodes } = require("http-status-codes");
 const { EmailService } = require("../services");
+const amqplib = require("amqplib");
+const { ServerConfig } = require("../config");
 
 const createTicket = async (req, res) => {
   try {
@@ -15,6 +17,29 @@ const createTicket = async (req, res) => {
   }
 };
 
+const connectQueue = async () => {
+  try {
+    const connection = await amqplib.connect("amqp://localhost");
+    const channel = await connection.createChannel();
+    await channel.assertQueue("flights-notiQueue");
+    channel.consume("flights-notiQueue", async (data) => {
+      console.log(`${Buffer.from(data.content)}`);
+      const object = JSON.parse(`${Buffer.from(data.content)}`);
+
+      await EmailService.sendEmail(
+       ServerConfig.FLIGHT_EMAIL,
+        object.recepientEmail,
+        object.subject,
+        object.text
+      );
+      channel.ack(data);
+    });
+  } catch (error) {
+    console.log(error);
+  }
+};
+
 module.exports = {
   createTicket,
+  connectQueue,
 };
