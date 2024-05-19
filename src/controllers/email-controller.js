@@ -2,6 +2,7 @@ const { StatusCodes } = require("http-status-codes");
 const { EmailService } = require("../services");
 const amqplib = require("amqplib");
 const { ServerConfig } = require("../config");
+const { SuccessResponse, ErrorResponse } = require("../utils/common");
 
 const createTicket = async (req, res) => {
   try {
@@ -10,10 +11,12 @@ const createTicket = async (req, res) => {
       content: req.body.content,
       recepientEmail: req.body.recepientEmail,
     });
-    return res.status(StatusCodes.CREATED).json(response);
+    SuccessResponse.data = response;
+    return res.status(StatusCodes.CREATED).json(SuccessResponse);
   } catch (error) {
     console.log(error);
-    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json(error);
+    ErrorResponse.error = error;
+    return res.status(error.statusCode).json(ErrorResponse);
   }
 };
 
@@ -27,7 +30,7 @@ const connectQueue = async () => {
       const object = JSON.parse(`${Buffer.from(data.content)}`);
 
       await EmailService.sendEmail(
-       ServerConfig.FLIGHT_EMAIL,
+        ServerConfig.FLIGHT_EMAIL,
         object.recepientEmail,
         object.subject,
         object.text
@@ -35,7 +38,8 @@ const connectQueue = async () => {
       channel.ack(data);
     });
   } catch (error) {
-    console.log(error);
+    ErrorResponse.error = error;
+    return res.status(error.statusCode).json(ErrorResponse);
   }
 };
 
